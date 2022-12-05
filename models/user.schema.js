@@ -3,6 +3,7 @@ import AuthRoles from '../utils/authRoles';
 import bcrypt from 'bcryptjs';
 import JWT from 'jsonwebtoken';
 import crypto from 'crypto';
+import config from '../config/index';
 
 const userSchema = mongoose.Schema(
 	{
@@ -36,11 +37,32 @@ const userSchema = mongoose.Schema(
 );
 
 // Encrypting the password, before saving it -> using "pre" hooks of mongoose
-
 userSchema.pre('save', async function (next) {
 	if (!this.modified('password')) return next();
 	this.password = await bcrypt.hash(this.password, 10);
 	next();
 });
+
+// Adding more functionality directly to schema
+userSchema.methods = {
+	// compare password
+	comparePassword: async function (enteredPassword) {
+		return await bcrypt.compare(enteredPassword, this.password);
+	},
+
+	//generate JWT token
+	getJwtToken: function () {
+		return JWT.sign(
+			{
+				_id: this._id,
+				role: this.role,
+			},
+			config.JWT_SECRET,
+			{
+				expiresIn: config.JWT_EXPIRY,
+			},
+		);
+	},
+};
 
 export default mongoose.model('User', userSchema);
