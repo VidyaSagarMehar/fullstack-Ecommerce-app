@@ -197,3 +197,22 @@ export const resetPassword = asyncHandler(async (req, res) => {
 		user,
 	});
 });
+
+/******************************************
+ * @PROFILE
+ * @REQUEST_TYPE GET
+ * @route http://localhost:4000/api/auth/profile
+ * description Check for token and populatereq.user
+ * @parameters
+ * @return User Object
+ ******************************************/
+export const getProfile = asyncHandler(async (req, res) => {
+	const { user } = req;
+	if (!user) {
+		throw new CustomError('User not foun', 404);
+	}
+	res.status(200).json({
+		success: true,
+		user,
+	});
+});
