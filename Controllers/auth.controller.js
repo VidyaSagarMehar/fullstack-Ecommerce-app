@@ -2,6 +2,7 @@ import User from '../models/user.schema';
 import asyncHandler from '../services/asyncHandler';
 import CustomError from '../utils/customError';
 import mailHelper from '../utils/mailHelper';
+import crypto from 'crypto';
 
 export const cookieOptions = {
 	expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
@@ -148,4 +149,51 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
 		throw new CustomError(err.message || 'Email sent failiure', 500);
 	}
+});
+
+/******************************************
+ * @RESET_PASSWORD
+ * @route http://localhost:4000/api/auth/password/reset/:resetPasswordToken
+ * description User will be able to reset password based on url token
+ * @parameters  token form url, password and confirm password
+ * @return user object
+ ******************************************/
+
+export const resetPassword = asyncHandler(async (req, res) => {
+	const { token: resetToken } = req.params;
+	const { password, confirmPassword } = req.body;
+
+	const resetPasswordToken = crypto
+		.createHash('sha256')
+		.update(resetToken)
+		.digest('hex');
+
+	const user = await User.findOne({
+		forgotPasswordToken: resetPasswordToken,
+		forgotPasswordExpiry: { $gt: Date.now() },
+	});
+	if (!user) {
+		throw new CustomError('Password token is invalid/ expired', 400);
+	}
+
+	if (password !== confirmPassword) {
+		throw new CustomError('Password does not match', 400);
+	}
+
+	user.password = password;
+	user.forgotPasswordToken = undefined; //preventing garbage value to store in DB
+	user.forgotPasswordExpiry = undefined; // preventing garbage value to store in DB
+
+	await user.save();
+
+	// Create token and send it as response
+	const token = user.getJwtToken();
+	user.password = undefined;
+
+	// Helper method for cookie can be added here
+	res.cookie('token', token, cookieOptions);
+	res.status(200).json({
+		success: true,
+		user,
+	});
 });
